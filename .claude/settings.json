@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(browser-use:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(date:*)",
+      "Bash(open:*)",
+      "Read",
+      "Write",
+      "Edit"
+    ]
+  }
+}
