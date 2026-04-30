@@ -25,8 +25,6 @@
 3. **执行** — 在每个动作上标注它在验证哪条 AC，按"关键节点"截图，向 `steps.log` 追加日志。一条 AC 在所有相关步骤都跑完后才下判定，不要边走边盖章。截图采集的具体纪律见下面 `### 截图与 AC 一一绑定`。
 4. **写报告** — 按 `report.md` 模板产出，`Findings` 按 AC 分段，每条独立给判定 + 观察 + 证据。
 
-具体的命令级流程见 `/test` slash command（`.claude/commands/test.md`）。
-
 ## 产物
 
 ### 目录结构
@@ -217,14 +215,14 @@ QA 视角的好例子：
 
 不同类型的 AC 对节奏要求差别很大；下面的"性能规则"适用之前先按这张表分档。判断不准就按更严格的那档来。
 
-| AC 类型 | 识别特征 | 执行策略 |
-| --- | --- | --- |
-| **纯交互** | 勾选 / 取消 / 翻页 / 改 filter / 按钮启用态切换 | 颗粒度跟着**截图清单**走 — 同一张截图内的多次 click 可以串发（如"勾 3 行后截一张"就 `click A && click B && click C` + 一次 screenshot）；**跨截图的 click 不能合并**（如 AC-6 "3→2→0 递减"清单要求 3 帧，就必须 click → screenshot → click → screenshot → click → screenshot 分三组，不能串发后只截终态，中间帧拿不回来）。**click 之间**不需要 sleep。 |
-| **含瞬态 UI** | 成功 toast / error toast / 一闪而过的 banner / 飞过的 dialog | 在**触发动作之前**装 `MutationObserver` 监听 `document.body` 子树新增节点；selector 用**关键词**匹配（`success` / `copied` / `error` / source/target 名字），**不要**依赖 `.ant-message` / `.ant-notification` / `[role=alert]` 这类标准 className——emotion / styled-components 的 class 是随机的（如 `css-q0z51b`），列举不全。触发后立即起 4 帧顺序截图（命令模板见下方），**不要用 `&` 后台跑** — daemon 队列会让时机失控。 |
-| **含多步向导** | wizard / stepper / "Step N of M" | 每点一次 next 之前先 dump 当前 step 文本 + 截图，再推进。**不要** `click + sleep + dump` 跨步合并 — 中间步骤可能被默认值自动跳过（典型现象：spec 写"3 步"但执行起来感觉只走了 2 步），跨步合并就再也察觉不到。 |
-| **含破坏性动作** | 改写真实数据 / 提交订单 / 发邮件给真实用户 | 触发前先抓 **baseline**（包含 AC "观察对象"列出的**所有**可能受影响字段，逐项 dump + 截图），触发后立即抓 **after**，两组并列对比。baseline 与 after 截图都计入该 AC 的截图清单。`report.md` 里这条 AC 的 Findings 用 baseline-vs-after 双图格式（见模板）。 |
-| **集合断言** | "列表 / dropdown 必须包含 N 类元素"、"所有状态都能作为 source"、"全字段保留" | 单张截图说明不了"集合属性"，必须配一份 `eval` dump 出全集合的 textContent / 属性数组（如 `Array.from(document.querySelectorAll('...')).map(e=>e.textContent.trim())`），落到 `steps.log`。AC 判定基于 dump 文本里能逐项点出的存在性，**不基于"截图里看到的几条"**。 |
-| **失败路径 / 错误信息** | "校验失败时给出可操作错误"、"输入非法时阻止提交"、"unauthorized 时拦截" | 先想清楚**怎么构造失败**（让 source 没数据、给非法输入、断网、用 unauthorized 账号）。当前环境造不出来就当场告诉用户、把这条 AC 标 `needs human review`，**不要**随便点几下没看到错误就宣称"未触发等于通过"。能构造的话，错误文案要逐字截图 + `eval` 抓出落到 `steps.log`，并验证"动作未生效 / 后端状态未改变"。 |
+| AC 类型                 | 识别特征                                                                     | 执行策略                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **纯交互**              | 勾选 / 取消 / 翻页 / 改 filter / 按钮启用态切换                              | 颗粒度跟着**截图清单**走 — 同一张截图内的多次 click 可以串发（如"勾 3 行后截一张"就 `click A && click B && click C` + 一次 screenshot）；**跨截图的 click 不能合并**（如 AC-6 "3→2→0 递减"清单要求 3 帧，就必须 click → screenshot → click → screenshot → click → screenshot 分三组，不能串发后只截终态，中间帧拿不回来）。**click 之间**不需要 sleep。                                                                        |
+| **含瞬态 UI**           | 成功 toast / error toast / 一闪而过的 banner / 飞过的 dialog                 | 在**触发动作之前**装 `MutationObserver` 监听 `document.body` 子树新增节点；selector 用**关键词**匹配（`success` / `copied` / `error` / source/target 名字），**不要**依赖 `.ant-message` / `.ant-notification` / `[role=alert]` 这类标准 className——emotion / styled-components 的 class 是随机的（如 `css-q0z51b`），列举不全。触发后立即起 4 帧顺序截图（命令模板见下方），**不要用 `&` 后台跑** — daemon 队列会让时机失控。 |
+| **含多步向导**          | wizard / stepper / "Step N of M"                                             | 每点一次 next 之前先 dump 当前 step 文本 + 截图，再推进。**不要** `click + sleep + dump` 跨步合并 — 中间步骤可能被默认值自动跳过（典型现象：spec 写"3 步"但执行起来感觉只走了 2 步），跨步合并就再也察觉不到。                                                                                                                                                                                                                 |
+| **含破坏性动作**        | 改写真实数据 / 提交订单 / 发邮件给真实用户                                   | 触发前先抓 **baseline**（包含 AC "观察对象"列出的**所有**可能受影响字段，逐项 dump + 截图），触发后立即抓 **after**，两组并列对比。baseline 与 after 截图都计入该 AC 的截图清单。`report.md` 里这条 AC 的 Findings 用 baseline-vs-after 双图格式（见模板）。                                                                                                                                                                   |
+| **集合断言**            | "列表 / dropdown 必须包含 N 类元素"、"所有状态都能作为 source"、"全字段保留" | 单张截图说明不了"集合属性"，必须配一份 `eval` dump 出全集合的 textContent / 属性数组（如 `Array.from(document.querySelectorAll('...')).map(e=>e.textContent.trim())`），落到 `steps.log`。AC 判定基于 dump 文本里能逐项点出的存在性，**不基于"截图里看到的几条"**。                                                                                                                                                            |
+| **失败路径 / 错误信息** | "校验失败时给出可操作错误"、"输入非法时阻止提交"、"unauthorized 时拦截"      | 先想清楚**怎么构造失败**（让 source 没数据、给非法输入、断网、用 unauthorized 账号）。当前环境造不出来就当场告诉用户、把这条 AC 标 `needs human review`，**不要**随便点几下没看到错误就宣称"未触发等于通过"。能构造的话，错误文案要逐字截图 + `eval` 抓出落到 `steps.log`，并验证"动作未生效 / 后端状态未改变"。                                                                                                               |
 
 下面的"性能规则"（不 sleep、合并 state dump 等）只对**纯交互**档强制；其它五档允许必要的同步等待、连续截图、跨步独立观察、构造异常输入。
 
