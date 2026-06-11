@@ -180,26 +180,56 @@ QA 视角的好例子：
 
 ## 浏览器接入
 
-本项目始终通过 CDP 接管 **用户当前正在使用的 Chrome**，这样用户可以随时介入（OAuth 登录、验证码、或者就是想中途接管）。
+本项目默认走 **独立 headless 浏览器 + cookie 注入**：从一份事先导出的 cookie 文件灌入登录态，在全新的 headless 实例里跑测试。这样 **不占用用户正在使用的 Chrome、不需要物理屏幕、不需要手动开远程调试端口**。被测系统的登录态是 **纯 cookie**（如 dispatch-portal 的 `SessionId`，httpOnly+secure 会话级 cookie），所以复制 cookie 即可绕过 SSO，无需自动化登录流程。
 
-每次测试会话开始时：
+### 默认路径：headless + cookie 注入
 
-1. 执行 `browser-use connect`。
-2. 如果失败，告诉用户：
+cookie 文件放在仓库内的 `secrets/` 目录（默认 `secrets/qa-cookies-foodtruck.json`，被测域精简版）。`secrets/` 已整目录写进 `.gitignore`——**放仓库内只是方便查看，绝不提交进 git**。每次测试会话开始时：
 
-   > 没有检测到开了远程调试的 Chrome。请先关掉当前 Chrome，然后用这个命令重新启动：
-   >
-   > ```
-   > open -a "Google Chrome" --args --remote-debugging-port=9222
-   > ```
-   >
-   > 启动后告诉我，我重试 connect。
+1. 起一个独立 headless 实例并灌 cookie（用 `--session` 命名，避免和别的会话互相干扰）：
 
-   然后等待。**不要** 静默回退到 headless 或 `--profile` 模式。
+   ```bash
+   browser-use --session qa open <被测站任意页>
+   browser-use --session qa cookies import secrets/qa-cookies-foodtruck.json
+   browser-use --session qa open <被测站目标页>      # 必须重新 open，import 后页面要重载 cookie 才生效
+   ```
 
-3. connect 成功后，执行一次 `browser-use state` 确认当前活跃 tab。如果用户的 Chrome 开了很多 tab，要主动问哪一个是被测对象——**不要** 自行假设。
+2. 验证是否真的进站了（**不要默认成功**）：dump 页面正文或关键文案。
+   - 未登录态的特征是页面只剩登录入口（dispatch-portal 表现为 `QA / Dispatch Portal / Enter`，只有一个 `Enter` 按钮）。
+   - 进站成功的特征是出现应用内真实数据 / UI（如列表、`Showing N results`、`Customize columns`）。
+   - 注意被测站是 SPA，进站后正文常先只有占位文本（如 "QA"），数据是异步拉的——用 `browser-use --session qa wait text "Showing"`（或某个稳定文案）等内容落地后再截图，不要立刻截。
 
-**本项目所有被测系统统一走 OAuth**：用户事先已在自己 Chrome 里登录过公司 SSO，进入被测网站后通常只需点一下 `Enter` / `Sign in` 按钮即可跳转完成认证。如果落到登录页，先尝试点这个按钮；登不上再停下来让用户手动处理。除非明确要求，否则 **不要** 尝试自动化登录流程（输账号密码等）。
+3. 如果第 2 步发现仍停在登录入口 → **判定 cookie 已过期**（`SessionId` 是会话级、无持久过期时间，服务端 session 超时即失效）。停下来提示用户重新导出 cookie（见下方「导出 / 刷新 cookie」），**不要** 自己瞎点 `Enter` 或尝试输账号密码。
+
+### 导出 / 刷新 cookie（A1 流程，cookie 失效时重做）
+
+cookie 由用户已登录的 Chrome 导出，只在初次配置或 cookie 过期时做一次：
+
+```bash
+browser-use connect                                   # 接管用户已登录被测站的 Chrome（需先开远程调试，见下）
+browser-use tab list                                  # 找到已登录被测站的 tab
+browser-use tab switch <index>                        # 切到那个 tab
+# 直接按被测站 URL 导出——只拿会发往该站的 cookie，自动排除无关子域，无需全量导出再筛：
+browser-use cookies export secrets/qa-cookies-foodtruck.json --url https://dispatch-portal.foodtruck-qa.com/
+```
+
+`connect` 需要用户的 Chrome 开了远程调试。如果 `connect` 失败，告诉用户：
+
+> 没有检测到开了远程调试的 Chrome。请先关掉当前 Chrome，然后用这个命令重新启动：
+>
+> ```
+> open -a "Google Chrome" --args --remote-debugging-port=9222
+> ```
+>
+> 启动后告诉我，我重试 connect。
+
+然后等待。
+
+### 备选路径：直接 connect 接管用户 Chrome
+
+当 **用户需要实时介入**（手动过验证码、临时人工操作、或就是想盯着看）时，可以放弃 headless，直接 `browser-use connect` 接管用户当前 Chrome。connect 成功后执行一次 `browser-use state` 确认活跃 tab；用户开了多个 tab 时主动问哪个是被测对象，**不要** 自行假设。
+
+除非用户明确要求，否则 **不要** 尝试自动化登录流程（输账号密码等）——纯 cookie 注入已经够用。
 
 ## 执行约束
 
