@@ -137,15 +137,29 @@ runs/<run-id>/
 
 ## Findings（按 AC）
 
+> 每条 AC 先用 Gherkin 步骤块复述被测内容（与 `ac.md` 一致，无需用户翻原文），再给判定 / 观察 / 证据。`观察` 是 UI 上的**实际值**，不要和 `Then` 里的**预期值**混写。
+
 ### AC-1: <一句话标题>
 
+```gherkin
+Given <前置状态>
+When <触发动作>
+Then <观察对象 + 预期值>
+```
+
 - **判定**: ✅ likely pass / ⚠️ needs human review / ❌ likely fail
-- **观察**: <2–3 句，描述实际发生了什么、和预期是否一致>
+- **观察**: <1 句话描述实际发生了什么、和预期是否一致>
 - **证据**:
   ![](screenshots/03-after-login.png)
 - **相关步骤**: `steps.log` `[10:32:14]`–`[10:32:21]`
 
 ### AC-2: <一句话标题>
+
+```gherkin
+Given 已登录且 session 已过期
+When 点击需要鉴权的入口
+Then 顶部出现红色 toast "session expired"
+```
 
 - **判定**: ❌ likely fail
 - **观察**: ...
@@ -154,6 +168,13 @@ runs/<run-id>/
 - **相关步骤**: `steps.log` `[10:32:24]`
 
 ### AC-3（破坏性动作 / before-after 双图模式）: <一句话标题>
+
+```gherkin
+Given source XX=A，target YY/ZZ 为初始值
+When 确认执行 Copy
+Then target XX 变为 A（与 source 一致）
+  And YY / ZZ 保持不变
+```
 
 - **判定**: ✅ likely pass
 - **观察**: 触发前后字段对比 — XX 从 A 变为 B（与 source 一致），YY/ZZ 不变。
