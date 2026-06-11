@@ -223,20 +223,31 @@ QA 视角的好例子：
 
 cookie 文件放在仓库内的 `secrets/` 目录（默认 `secrets/qa-cookies-foodtruck.json`，被测域精简版）。`secrets/` 已整目录写进 `.gitignore`——**放仓库内只是方便查看，绝不提交进 git**。每次测试会话开始时：
 
-1. 起一个独立 headless 实例并灌 cookie（用 `--session` 命名，避免和别的会话互相干扰）：
+1. 起一个独立 headless 实例并灌 cookie。**session 名必须用本次的 run-id**（如 `--session 2026-06-11-103214-hdr-copy`），不要再写死成 `qa`——这样多个终端 / 多个 run 各自独立浏览器实例，互不干扰。下面的命令用 `$SID` 代指这个 run-id：
 
    ```bash
-   browser-use --session qa open <被测站任意页>
-   browser-use --session qa cookies import secrets/qa-cookies-foodtruck.json
-   browser-use --session qa open <被测站目标页>      # 必须重新 open，import 后页面要重载 cookie 才生效
+   browser-use --session $SID open <被测站任意页>
+   browser-use --session $SID cookies import secrets/qa-cookies-foodtruck.json
+   browser-use --session $SID open <被测站目标页>      # 必须重新 open，import 后页面要重载 cookie 才生效
    ```
+
+   测试结束后用 `browser-use --session $SID close` 关掉这个实例，别把 daemon 留着占资源。
 
 2. 验证是否真的进站了（**不要默认成功**）：dump 页面正文或关键文案。
    - 未登录态的特征是页面只剩登录入口（dispatch-portal 表现为 `QA / Dispatch Portal / Enter`，只有一个 `Enter` 按钮）。
    - 进站成功的特征是出现应用内真实数据 / UI（如列表、`Showing N results`、`Customize columns`）。
-   - 注意被测站是 SPA，进站后正文常先只有占位文本（如 "QA"），数据是异步拉的——用 `browser-use --session qa wait text "Showing"`（或某个稳定文案）等内容落地后再截图，不要立刻截。
+   - 注意被测站是 SPA，进站后正文常先只有占位文本（如 "QA"），数据是异步拉的——用 `browser-use --session $SID wait text "Showing"`（或某个稳定文案）等内容落地后再截图，不要立刻截。
 
 3. 如果第 2 步发现仍停在登录入口 → **判定 cookie 已过期**（`SessionId` 是会话级、无持久过期时间，服务端 session 超时即失效）。停下来提示用户重新导出 cookie（见下方「导出 / 刷新 cookie」），**不要** 自己瞎点 `Enter` 或尝试输账号密码。
+
+### 多终端并行
+
+可以同时开多个终端各跑一个 run，前提是上面的 session 名用各自 run-id 区分（否则共用浏览器实例会互相搅乱页面）。产物目录天然按 run-id 隔离，不会互相覆盖。
+
+但有一条限制工具层面保证不了，**靠用户协调**：多个终端灌的是同一份 cookie、同一个后端账号，所以**破坏性 / 改写真实数据的 AC 不要跨终端并行跑**——A 终端改的数据会被 B 终端看到甚至覆盖，两边结论都不可信。每个终端只看得到自己的 run，看不到别的终端在干什么，**没法自动检测到这种冲突**。所以：
+
+- 纯读 / 探索 / 集合断言类 AC → 随便几个终端并行，无所谓。
+- 如果你（执行者）发现自己这个 run 里有破坏性 AC，**主动提醒这个并发写风险**，让用户决定是否继续。
 
 ### 导出 / 刷新 cookie（A1 流程，cookie 失效时重做）
 
