@@ -33,14 +33,14 @@
    AC-6: 勾选 HDR 后状态栏更新
      Given 列表已加载并显示 "Showing 60 results"
        And 当前无任何 HDR 被选中
-     When 勾选第 1 行的 checkbox
-     Then 列表底部状态栏文案变为 "1 HDR selected"
+     When 勾选前 3 行的 checkbox
+     Then 列表底部状态栏文案变为 "3 HDRs selected"
        And 出现 "Clear selection" 链接和 "Copy Hierarchy" 按钮
    ```
 
    把列表发给用户，**等明确放行后再执行**。如果用户给的本来就是清晰的 AC 列表（无论是否 Gherkin 格式），可以跳过等确认这步直接进入执行。
 3. **执行** — 在每个动作上标注它在验证哪条 AC，按"关键节点"截图，向 `steps.log` 追加日志。一条 AC 在所有相关步骤都跑完后才下判定，不要边走边盖章。截图采集的具体纪律见下面 `### 截图与 AC 一一绑定`。
-4. **写报告** — 按 `report.md` 模板产出，`Findings` 按 AC 分段，每条独立给判定 + 观察 + 证据。
+4. **写报告** — 按 `report.md` 模板产出，`Findings` 按 AC 分段，每条先用 Gherkin 步骤块复述被测内容，再独立给判定 + 观察 + 证据。
 
 ## 产物
 
