@@ -9,11 +9,13 @@
 - **你** 是测试执行者：驱动浏览器、采集证据、产出报告。
 - **用户** 是判定者：阅读你的报告，决定 pass / fail / 需要进一步排查。
 - 你的职责 **不是** 自己宣布"测试通过"，而是产出足够多的证据让用户来判断。
-- **`report.md` 是用户唯一一定会读的产物**。截图和 `steps.log` 是支撑材料，写报告时假设用户只看这一份就要能判定——关键观察直接写进 `Findings` 的文字里，不要全堆"详见截图 03"敷衍过去。
+- **`report.md` 是用户唯一一定会读的产物**。截图是支撑材料，写报告时假设用户只看这一份就要能判定——关键观察直接写进 `Findings` 的文字里，不要全堆"详见截图 03"敷衍过去。
 
-## 输入：Targets
+## 输入：环境与站
 
-- `targets/*.md` — 单个被测系统的基本信息（URL、环境）。如果用户点名某个 target，开始前先读对应文件。
+- `targets/<env>.md` — **一个文件对应一个环境**（`qa.md` / `uat.md`），里面是这个环境下的**一整组站**：每个站一行，含 `id` + URL。`id` 用作 AC 的 `@site` 标注、session 后缀（`$SID-<id>`）、截图前缀。同一个站的 `id` 跨环境保持一致。
+- 一次测试 = **选一个环境** + 在其中作用于 **一个或多个站**。单站是最常见情形（N=1）；涉及多个站（跨站联动）按下面的「跨站测试」执行。
+- **测哪个环境、是否跨站、涉及哪几个站，都由用户在意图 / AC 阶段说清**——不自己猜，也没有预存的"场景"文件。开始前读对应的 `targets/<env>.md` 取各站 URL。
 
 ## 工作流总览
 
@@ -21,7 +23,6 @@
 
 1. **解析意图** — 从用户输入识别目标 URL / 系统名 / 范围 / 特殊要求。意图不清晰、URL 缺失、或者范围模糊到无法执行，**先问再开始**，不要瞎猜。
 2. **起草 AC 并等用户确认（强制）** — 把意图翻译成一份可验证的 **验收标准（AC, Acceptance Criteria）** 列表，每条是一个能独立判定通过 / 失败的布尔判断。**每条 AC 必须用 Gherkin Step 规范表达**，至少包含 `Given` / `When` / `Then` 三类步骤，同类步骤的并列 / 反向条件用 `And` / `But` 追加：
-
    - **Given** — 前置状态：触发前可观察的环境（已登录、列表已加载 "Showing N results"、无选中项……）。这是可复现性的前提，也是"失败路径"类 AC 必须显式写出的被测条件（如"source 没数据"）。
    - **When** — 触发动作：勾选 / 点击 / 提交 / 跳转，一条 AC 原则上只有一个主 `When`。
    - **Then** — 预期结果，**必须落到具体观察对象**（selector / 页面入口 / 原文文案）+ 预期值，不能只写抽象判断。
@@ -38,9 +39,11 @@
        And 出现 "Clear selection" 链接和 "Copy Hierarchy" 按钮
    ```
 
-   把列表发给用户，**等明确放行后再执行**。如果用户给的本来就是清晰的 AC 列表（无论是否 Gherkin 格式），可以跳过等确认这步直接进入执行。
-3. **执行** — 在每个动作上标注它在验证哪条 AC，按"关键节点"截图，向 `steps.log` 追加日志。一条 AC 在所有相关步骤都跑完后才下判定，不要边走边盖章。截图采集的具体纪律见下面 `### 截图与 AC 一一绑定`。
-4. **写报告** — 按 `report.md` 模板产出，`Findings` 按 AC 分段，每条先用 Gherkin 步骤块复述被测内容，再独立给判定 + 观察 + 证据。
+   把列表发给用户，**等明确放行后再执行**。如果用户有新的补充，需要重复当前步骤起草 AC 并等待用户确认。
+
+3. **写 AC 清单** — 把用户确认后的 AC 列表写入 `ac.md`，格式同上。
+4. **执行** — 在每个动作上标注它在验证哪条 AC，按"关键节点"截图。一条 AC 在所有相关步骤都跑完后才下判定，不要边走边盖章。截图采集的具体纪律见下面 `### 截图与 AC 一一绑定`。
+5. **写报告** — 按 `report.md` 模板产出，`Findings` 按 AC 分段，每条先用 Gherkin 步骤块复述被测内容，再独立给判定 + 观察 + 证据。
 
 ## 产物
 
@@ -53,13 +56,12 @@ runs/<run-id>/
 ├── ac.md                  — 用户确认后的 AC 列表 + 截图清单
 ├── screenshots/
 │   └── NN[a-z]-<slug>.png — 关键节点截图。基础按执行顺序递增 NN；同一条 AC 有多帧时用 NNa / NNb / NNc 分组（如 17a-3-selected.png / 17b-2-after-uncheck.png / 17c-cleared.png）。
-├── steps.log              — 追加式动作日志
 └── report.md              — 给人看的最终报告
 ```
 
 ### 重做与补测
 
-- **同一条 AC 因证据不足 / 措辞模糊 / 截图错配 而重做** → 续写到**原 run 目录**。截图编号顺接（原来到 `16-...`，重做就从 `17-...` 开始）；在 `steps.log` 末尾加一行 `=== Re-run for evidence quality (AC-X) ===` 作为分隔；`report.md` 里对应 AC 的 Findings 直接更新到最新结论，保留对原 baseline 截图的引用即可。
+- **同一条 AC 因证据不足 / 措辞模糊 / 截图错配 而重做** → 续写到**原 run 目录**。截图编号顺接（原来到 `16-...`，重做就从 `17-...` 开始）；`report.md` 里对应 AC 的 Findings 直接更新到最新结论，保留对原 baseline 截图的引用即可。
 - **重新跑一整轮完整测试**（如版本升级后回归、隔天复测）→ **开新 run** 目录（新 run-id）。
 
 ### 跨 run 引用纪律
@@ -67,7 +69,7 @@ runs/<run-id>/
 每份 `report.md` 是独立产物，必须假设读者只读这一份。
 
 - 不要在 report 里写"与上一轮一致 / 上一轮的 #N / 比上一轮快"之类的跨 run 引用 —— 每条 AC 的观察基于本次 run 自己抓到的证据。
-- 不要在测试执行阶段把旧 run 的发现当"先验知识"去避坑。陷阱（比如某个 UI 控件点了会跳页、某个 toast 用 emotion 随机 class 渲染）每次都应该正常踩、正常记录、正常写进 Open question —— 它们是产品当下真实的样子，规避它们等于帮产品掩盖问题。
+- **不要在测试执行阶段读取旧 run，除非用户明确提及，不要把旧 run 的发现当"先验知识"**。陷阱（比如某个 UI 控件点了会跳页、某个 toast 用 emotion 随机 class 渲染）每次都应该正常踩、正常记录、正常写进 Open question —— 它们是产品当下真实的样子，规避它们等于帮产品掩盖问题。
 - **例外**：用户明确说"参考上一轮"、"在 run X 基础上补测"、"对比 run A 和 run B"，或当前 run 的 `ac.md` 自身写明要参照另一个 run。
 - 用户问"上次怎么测的 / 旧 report 写了啥"这类**对话性**问题时，可以读旧 run 回答，但仅限对话，不要把读到的内容写回新 run 的产物。
 
@@ -81,7 +83,7 @@ runs/<run-id>/
 - 任何意料之外的情况：错误 toast、布局错乱、加载缓慢、控制台报错、4xx/5xx 响应
 - 每个场景的最终状态
 
-不要为琐碎的中间状态截图（敲每一个字符、滚动）——`steps.log` 已经能交代清楚。
+不要为琐碎的中间状态截图（敲每一个字符、滚动）。
 
 #### 截图与 AC 一一绑定
 
@@ -90,32 +92,13 @@ runs/<run-id>/
 - 起草 AC 时，在 `ac.md` 末尾追加一份 `## 截图清单` 小节，列出每条 AC 期望产出的截图文件名 + 应展示的状态。例如：`AC-6 → 17a-3-selected.png: banner "3 HDRs selected"` / `17b-2-after-uncheck.png: banner "2 HDRs selected"` / `17c-cleared.png: banner 消失，"Showing N results" 回归`。一条 AC 有几个判定瞬间就列几张（如计数递减类至少 3 帧）。
 - 跑的时候按清单逐条交付。没拍齐对应截图的 AC 不算完成。
 - 写 `report.md` 时若某条 AC 的"证据"还要回头借用别的 AC 的截图，停下来重做这条 AC 的现场，而不是凑数。
-- 截图本身视觉差异太小（如 checkbox 对勾、灰显态）可能"截了也看不出"，这种情况除了截图外，还要在 `steps.log` 里同步落一行 `eval` 抓到的文本证据（如 "checkedOnPage=[# Lenetest, # lin test init 0]"），让人和图一起读。
-
-### `steps.log` 格式
-
-向 `steps.log` 追加，每个有意义的动作一行：
-
-```
-[HH:MM:SS] [AC-N] ACTION  → RESULT
-```
-
-`[AC-N]` 标记当前动作在验证哪条 AC；与某条 AC 无直接关系的准备步骤（打开入口、跳转登录页等）用 `[--]`。
-
-示例：
-
-```
-[10:32:14] [--]   open https://staging.example.com/login  → 200, title="Sign in"
-[10:32:18] [AC-1] input #email "qa@x.com"  → ok
-[10:32:21] [AC-1] click "Sign in"  → navigated to /dashboard, screenshot 03-after-login.png
-[10:32:24] [AC-2] OBSERVE  → red toast "session expired" appeared briefly, screenshot 04-toast.png
-```
+- 截图本身视觉差异太小（如 checkbox 对勾、灰显态）可能"截了也看不出"，这种情况尽量把目标元素截清楚（必要时裁剪 / 放大），并在 `report.md` 对应 AC 的"观察"里用文字把状态说明白（如"前 3 行 checkbox 已勾选"）。
 
 ### `report.md` 模板
 
 `report.md` 要简洁、可扫读，开头先给结论。用这个骨架：
 
-```markdown
+````markdown
 # <test title>
 
 - **Target**: <url 或应用名>
@@ -151,7 +134,6 @@ Then <观察对象 + 预期值>
 - **观察**: <1 句话描述实际发生了什么、和预期是否一致>
 - **证据**:
   ![](screenshots/03-after-login.png)
-- **相关步骤**: `steps.log` `[10:32:14]`–`[10:32:21]`
 
 ### AC-2: <一句话标题>
 
@@ -165,7 +147,6 @@ Then 顶部出现红色 toast "session expired"
 - **观察**: ...
 - **证据**:
   ![](screenshots/04-toast.png)
-- **相关步骤**: `steps.log` `[10:32:24]`
 
 ### AC-3（破坏性动作 / before-after 双图模式）: <一句话标题>
 
@@ -183,12 +164,11 @@ Then target XX 变为 A（与 source 一致）
     ![](screenshots/11-baseline-foo.png)
   - 触发后 after:
     ![](screenshots/16-after-foo.png)
-- **相关步骤**: `steps.log` `[10:51:00]`–`[10:51:35]`
 
 ## Open questions for the QA
 
 - <你不太确定、希望用户复核的点>
-```
+````
 
 每条 AC 单独成段，`判定` 在最前面，方便扫读。`Verdict (initial)` 是 **你对整体的** 初判，不替代用户的判断；单条 AC 的判定也是初判性质。
 
@@ -203,7 +183,7 @@ QA 视角的好例子：
 - "Confirm Copy 后约 0.5 秒页面顶部出现成功提示 'Hierarchy copied. The ranking from lin test init has been applied to # Lenetest.'，约 2 秒后自动消失"
 - "点行的 HDR 名会跳进该 HDR 的详情页，同时这一行也被勾上 —— 一次点击触发了两件事，普通用户可能不预期"
 
-避免的写法（这些信息进 `steps.log`，**不进** report 的"观察"）：
+避免的写法（这些**不进** report 的"观察"）：
 
 - DOM 细节：`<span class="css-q0z51b">`、`input[type=checkbox]`、selector 策略
 - 事件 / 实现机制：event 冒泡、onChange 没触发、antd `<label>` 包 `<input>` 的结构问题
@@ -221,17 +201,17 @@ QA 视角的好例子：
 
 ### 默认路径：headless + cookie 注入
 
-cookie 文件放在仓库内的 `secrets/` 目录（默认 `secrets/qa-cookies-foodtruck.json`，被测域精简版）。`secrets/` 已整目录写进 `.gitignore`——**放仓库内只是方便查看，绝不提交进 git**。每次测试会话开始时：
+cookie 用全项目**同一份全量** `secrets/cookies-all.json`——含你 Chrome 里所有站、所有环境（qa / uat）的登录态，单站 / 跨站通用一份。`secrets/` 已整目录写进 `.gitignore`——**放仓库内只是方便查看，绝不提交进 git**；全量文件泄漏炸的是你整个数字身份，尤其别 `git add -f`。每次测试会话开始时：
 
-1. 起一个独立 headless 实例并灌 cookie。**session 名必须用本次的 run-id**（如 `--session 2026-06-11-103214-hdr-copy`），不要再写死成 `qa`——这样多个终端 / 多个 run 各自独立浏览器实例，互不干扰。下面的命令用 `$SID` 代指这个 run-id：
+1. 起一个独立 headless 实例并灌 cookie。**session 名必须用本次的 run-id**（如 `--session 2026-06-11-103214-hdr-copy`），不要再写死成 `qa`——这样多个终端 / 多个 run 各自独立浏览器实例，互不干扰。下面的命令用 `$SID` 代指这个 run-id，目标 URL 从 `targets/<env>.md` 取：
 
    ```bash
-   browser-use --session $SID open <被测站任意页>
-   browser-use --session $SID cookies import secrets/qa-cookies-foodtruck.json
-   browser-use --session $SID open <被测站目标页>      # 必须重新 open，import 后页面要重载 cookie 才生效
+   browser-use --session $SID open <目标站任意页>
+   browser-use --session $SID cookies import secrets/cookies-all.json
+   browser-use --session $SID open <目标站目标页>      # 必须重新 open，import 后页面要重载 cookie 才生效
    ```
 
-   测试结束后用 `browser-use --session $SID close` 关掉这个实例，别把 daemon 留着占资源。
+测试结束后用 `browser-use --session $SID close` 关掉这个实例，别把 daemon 留着占资源。
 
 2. 验证是否真的进站了（**不要默认成功**）：dump 页面正文或关键文案。
    - 未登录态的特征是页面只剩登录入口（dispatch-portal 表现为 `QA / Dispatch Portal / Enter`，只有一个 `Enter` 按钮）。
@@ -239,6 +219,19 @@ cookie 文件放在仓库内的 `secrets/` 目录（默认 `secrets/qa-cookies-f
    - 注意被测站是 SPA，进站后正文常先只有占位文本（如 "QA"），数据是异步拉的——用 `browser-use --session $SID wait text "Showing"`（或某个稳定文案）等内容落地后再截图，不要立刻截。
 
 3. 如果第 2 步发现仍停在登录入口 → **判定 cookie 已过期**（`SessionId` 是会话级、无持久过期时间，服务端 session 超时即失效）。停下来提示用户重新导出 cookie（见下方「导出 / 刷新 cookie」），**不要** 自己瞎点 `Enter` 或尝试输账号密码。
+
+### 跨站：每站一个 session
+
+单站测试就一个 session（上面的 `$SID`）。**跨站测试**（同一环境下碰多个站）时，cookie 不变——还是同一份全量 `secrets/cookies-all.json`，它本来就含所有站。差别只在 **session**：本次涉及的每个站起一个 **独立 session**，名 = `$SID-<site-id>`（如 `$SID-portal` / `$SID-billing`），这样各站页面同时活着，在 A 操作完切到 B 直接看，不丢 B 的 filter / 滚动状态。遍历本次站清单（`ac.md` 的 `## 站` 块）批量起，每个都灌同一份全量 cookie：
+
+```bash
+# 对清单里每个涉及的站（id=portal / billing / ...）：
+browser-use --session $SID-portal  open <portal 目标页>      # URL 从 targets/<env>.md 取
+browser-use --session $SID-portal  cookies import secrets/cookies-all.json
+browser-use --session $SID-portal  open <portal 目标页>      # import 后必须重新 open 才生效
+```
+
+**逐站验证进站，不要因为是全量就假设 N 个站全活**：对每个 session 单独 dump 关键文案确认进了应用内（特征见「默认路径」第 2 步）。任一站仍停在登录入口 → 判定该站 cookie 失效，停下来提示重新导出全量，**不要** 自己瞎点。测完对每个 `$SID-<id>` 都 `close`。
 
 ### 多终端并行
 
@@ -251,14 +244,11 @@ cookie 文件放在仓库内的 `secrets/` 目录（默认 `secrets/qa-cookies-f
 
 ### 导出 / 刷新 cookie（A1 流程，cookie 失效时重做）
 
-cookie 由用户已登录的 Chrome 导出，只在初次配置或 cookie 过期时做一次：
+cookie 由用户已登录的 Chrome 导出，只在初次配置或 cookie 过期时做一次。导出**全量**（不带 `--url`），一份覆盖所有站、所有环境，无需切 tab、无需逐站导：
 
 ```bash
-browser-use connect                                   # 接管用户已登录被测站的 Chrome（需先开远程调试，见下）
-browser-use tab list                                  # 找到已登录被测站的 tab
-browser-use tab switch <index>                        # 切到那个 tab
-# 直接按被测站 URL 导出——只拿会发往该站的 cookie，自动排除无关子域，无需全量导出再筛：
-browser-use cookies export secrets/qa-cookies-foodtruck.json --url https://dispatch-portal.foodtruck-qa.com/
+browser-use connect                                   # 接管用户的 Chrome（需先开远程调试，见下）
+browser-use cookies export secrets/cookies-all.json   # 不带 --url = 全量，含所有站 / 环境
 ```
 
 `connect` 需要用户的 Chrome 开了远程调试。如果 `connect` 失败，告诉用户：
@@ -277,7 +267,58 @@ browser-use cookies export secrets/qa-cookies-foodtruck.json --url https://dispa
 
 当 **用户需要实时介入**（手动过验证码、临时人工操作、或就是想盯着看）时，可以放弃 headless，直接 `browser-use connect` 接管用户当前 Chrome。connect 成功后执行一次 `browser-use state` 确认活跃 tab；用户开了多个 tab 时主动问哪个是被测对象，**不要** 自行假设。
 
-除非用户明确要求，否则 **不要** 尝试自动化登录流程（输账号密码等）——纯 cookie 注入已经够用。
+除非用户明确要求，否则 **不要** 尝试自动化登录流程（输账号密码等）—— 纯 cookie 注入已经够用。
+
+## 跨站测试（多站场景）
+
+当用户在意图 / AC 阶段声明本次测试要在 **同一环境下的多个站** 之间联动（在 A 操作、在 B / C 观察效果），启用这一节。**只在涉及 ≥2 个站时启用**；单站测试一切照旧。核心原则：**cookie 这层塌成一份全量，但"站"作为产物维度始终保留**——否则报告说不清"在哪操作、在哪观察"。
+
+- **环境是 run 级的、单一的**：一个跨站测试始终在一个环境内（全程 qa 或全程 uat），不混。开始前读对应的 `targets/<env>.md` 拿到本环境的站清单（`id → URL`）。
+- **本次涉及哪几个站 + 各自角色（操作端 / 观察端），由用户在 AC 阶段说清**，记进该 run 的 `ac.md` 一个 `## 站` 块：每行 `@<id> → 本环境 URL + 角色`。这份 `## 站` 块就是本次的**站清单**——起 session、`@site` 标注都按它来。
+
+> 浏览器 / session / cookie 怎么开是机制，统一在「浏览器接入 → 跨站：每站一个 session」，不在这里重复。本节只讲跨站测试本身怎么设计与判定。
+
+### "站"维度贯穿所有产物
+
+cookie 全量了不代表站可以省。每个产物都带一个 site 标签，数量无关（2 / 3 / N 同一套）：
+
+- **AC 步骤**：每个 step 标 `@<site-id>`，site-id 来自 `targets/<env>.md` 的站清单。一个主 `When`（在某个操作端），`Then` 可以是多站的 `And` 列表（扇出观察），异步生效的观察把超时窗口写进 `Then`：
+
+  ```gherkin
+  AC-1: admin 开启 Auto-dispatch 后，portal 与 billing 同步生效
+    Given @admin 规则页显示 "Auto-dispatch: OFF"
+      And @portal 列表顶部无 "Auto" 标记
+    When @admin 把 "Auto-dispatch" 切到 ON 并点 "Save"
+    Then @admin 出现保存成功提示 "Saved"
+      And @portal 刷新后列表顶部出现 "Auto" 标记
+      And @billing 在 60s 内出现一条 type="auto-dispatch" 的计费记录
+  ```
+
+- **截图**：站名进 slug，如 `17-portal-auto-badge.png` / `18-billing-record.png`。`ac.md` 的截图清单按 `@site` 分别列。
+- **session**：`$SID-<site-id>`，如上。
+
+### 多站扇出观察（一个 When，多个 Then@site）
+
+一个操作端的动作常要在多个观察端分别验证生效。这种 AC 的 `Then` 是 **多站的 And 列表**，每个站 **独立判定、独立截图、独立超时**——不要糊成一段。`report.md` 里这条 AC 的"观察"按站分行：
+
+```
+- 观察:
+  - @portal: 刷新后列表顶部出现 "Auto" 标记 — 符合
+  - @billing: 90s 内未见 type="auto-dispatch" 计费记录 — 不符合（预期 60s 内）
+```
+
+任一站不符合，整条 AC 判 ❌ / ⚠️，并指明是哪个站断的。
+
+### 跨站时序链：每跳留证据 + 轮询超时
+
+跨站传播往往 **不是同步的**（中间隔着队列、消息、最终一致性），且常常 **有先后依赖**（admin 配完 portal 才出入口，portal 提交后 billing 才落账）。两条纪律：
+
+1. **每一跳都留证据**。`@admin 操作 → @portal 生效 → @billing 落账` 这条链，每跳都 dump + 截图。否则最后只看到 `@billing` 没数据，根本分不清是 admin 没生效、还是 portal 没提交、还是 billing 还没传到。
+2. **异步观察用轮询 + 明确超时，不要盲 sleep**。`Then` 里写清超时窗口（如 "60s 内"），用 `browser-use --session $SID-billing wait text "..."` 配 `--timeout`，或固定间隔轮询直到出现 / 超时。**超时不等于 fail**：构造得出的失败才判 ❌；只是没等到、原因不明的，判 `needs human review` 并在 Open question 里写清等了多久、轮询了几次。
+
+### 并发写风险（跨站尤其要警惕）
+
+机制与处理规则同「浏览器接入 → 多终端并行」，不在此重复。跨站特有的点只有一个：跨站的操作端动作 **通常本身就是写操作**，所以那条"破坏性 / 改写真实数据的 AC 不要跨终端 / 跨 run 并行跑"的风险，在跨站时几乎必然命中——发现本 run 有这类跨站 AC，照样主动提醒、让用户决定是否串行。
 
 ## 执行约束
 
@@ -299,8 +340,8 @@ browser-use cookies export secrets/qa-cookies-foodtruck.json --url https://dispa
 | **含瞬态 UI**           | 成功 toast / error toast / 一闪而过的 banner / 飞过的 dialog                 | 在**触发动作之前**装 `MutationObserver` 监听 `document.body` 子树新增节点；selector 用**关键词**匹配（`success` / `copied` / `error` / source/target 名字），**不要**依赖 `.ant-message` / `.ant-notification` / `[role=alert]` 这类标准 className——emotion / styled-components 的 class 是随机的（如 `css-q0z51b`），列举不全。触发后立即起 4 帧顺序截图（命令模板见下方），**不要用 `&` 后台跑** — daemon 队列会让时机失控。 |
 | **含多步向导**          | wizard / stepper / "Step N of M"                                             | 每点一次 next 之前先 dump 当前 step 文本 + 截图，再推进。**不要** `click + sleep + dump` 跨步合并 — 中间步骤可能被默认值自动跳过（典型现象：spec 写"3 步"但执行起来感觉只走了 2 步），跨步合并就再也察觉不到。                                                                                                                                                                                                                 |
 | **含破坏性动作**        | 改写真实数据 / 提交订单 / 发邮件给真实用户                                   | 触发前先抓 **baseline**（包含 AC "观察对象"列出的**所有**可能受影响字段，逐项 dump + 截图），触发后立即抓 **after**，两组并列对比。baseline 与 after 截图都计入该 AC 的截图清单。`report.md` 里这条 AC 的 Findings 用 baseline-vs-after 双图格式（见模板）。                                                                                                                                                                   |
-| **集合断言**            | "列表 / dropdown 必须包含 N 类元素"、"所有状态都能作为 source"、"全字段保留" | 单张截图说明不了"集合属性"，必须配一份 `eval` dump 出全集合的 textContent / 属性数组（如 `Array.from(document.querySelectorAll('...')).map(e=>e.textContent.trim())`），落到 `steps.log`。AC 判定基于 dump 文本里能逐项点出的存在性，**不基于"截图里看到的几条"**。                                                                                                                                                            |
-| **失败路径 / 错误信息** | "校验失败时给出可操作错误"、"输入非法时阻止提交"、"unauthorized 时拦截"      | 先想清楚**怎么构造失败**（让 source 没数据、给非法输入、断网、用 unauthorized 账号）。当前环境造不出来就当场告诉用户、把这条 AC 标 `needs human review`，**不要**随便点几下没看到错误就宣称"未触发等于通过"。能构造的话，错误文案要逐字截图 + `eval` 抓出落到 `steps.log`，并验证"动作未生效 / 后端状态未改变"。                                                                                                               |
+| **集合断言**            | "列表 / dropdown 必须包含 N 类元素"、"所有状态都能作为 source"、"全字段保留" | 单张截图说明不了"集合属性"，必须配一份 `eval` dump 出全集合的 textContent / 属性数组（如 `Array.from(document.querySelectorAll('...')).map(e=>e.textContent.trim())`），把结果写进 `report.md` 对应 AC 的"观察"里。AC 判定基于 dump 文本里能逐项点出的存在性，**不基于"截图里看到的几条"**。                                                                                                                                   |
+| **失败路径 / 错误信息** | "校验失败时给出可操作错误"、"输入非法时阻止提交"、"unauthorized 时拦截"      | 先想清楚**怎么构造失败**（让 source 没数据、给非法输入、断网、用 unauthorized 账号）。当前环境造不出来就当场告诉用户、把这条 AC 标 `needs human review`，**不要**随便点几下没看到错误就宣称"未触发等于通过"。能构造的话，错误文案要逐字截图（必要时把原文写进"观察"），并验证"动作未生效 / 后端状态未改变"。                                                                                                                   |
 
 下面的"性能规则"（不 sleep、合并 state dump 等）只对**纯交互**档强制；其它五档允许必要的同步等待、连续截图、跨步独立观察、构造异常输入。
 
@@ -362,7 +403,7 @@ browser-use eval "<触发动作的 click>" \
 
 #### 步骤之间的叙述要极简
 
-对用户输出 **每验证完一个 AC 或者撞到一个 blocker 一行短话**——不是每点一次一行。不要重复 `steps.log` 里已经有的内容。你产出的 token 是用户付的延迟成本。
+对用户输出 **每验证完一个 AC 或者撞到一个 blocker 一行短话**——不是每点一次一行。你产出的 token 是用户付的延迟成本。
 
 #### 一次 state dump 多次复用
 
@@ -374,3 +415,11 @@ browser-use eval "<触发动作的 click>" \
 - 不要编造测试结果。页面没加载就如实记录并停下来——不要猜"如果加载了会怎样"。
 - 不要从这个目录自动 commit 任何东西到 git。测试产物是本地资料。
 - 不要删除或改写过往的 `runs/` 目录——它们是证据。
+
+```
+
+```
+
+```
+
+```
