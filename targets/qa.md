@@ -10,6 +10,7 @@
 
 ## 站
 
-| id     | URL                                      | 说明                          |
-| ------ | ---------------------------------------- | ----------------------------- |
-| portal | https://dispatch-portal.foodtruck-qa.com | 派单门户（列表 / HDR 详情等） |
+| id              | URL                                      | 说明     | 本地前端代码目录                                                                         |
+| --------------- | ---------------------------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| dispatch-portal | https://dispatch-portal.foodtruck-qa.com | 派单门户 | /Users/jason/Coding/changtuo/hdr-delivery-project/frontend/dispatch-portal-site-frontend |
+| order           | https://orderv2.foodtruck-qa.com         | 订单中心 |
