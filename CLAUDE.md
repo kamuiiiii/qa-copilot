@@ -13,7 +13,18 @@
 
 ## 输入：环境与站
 
-- `targets/<env>.md` — **一个文件对应一个环境**（`qa.md` / `uat.md`），里面是这个环境下的**一整组站**：每个站一行，含 `id` + URL。`id` 用作 AC 的 `@site` 标注、session 后缀（`$SID-<id>`）、截图前缀。同一个站的 `id` 跨环境保持一致。
+- `targets/<env>.md` — **一个文件对应一个环境**（`qa.md` / `uat.md`），里面是这个环境下的**一整组站**，以一张 `## 站` Markdown 表登记，每站一行 `| id | URL | 说明 |`，例如：
+
+  ```markdown
+  ## 站
+
+  | id              | URL                                      | 说明     |
+  | --------------- | ---------------------------------------- | -------- |
+  | dispatch-portal | https://dispatch-portal.foodtruck-qa.com | 派单门户 |
+  | order           | https://orderv2.foodtruck-qa.com         | 订单中心 |
+  ```
+
+  `id` 用作 AC 的 `@site` 标注、session 后缀（`$SID-<id>`）；**截图前缀只在跨站测试时带**（单站截图不带站前缀，见下方截图样例 `03-after-login.png` / `17a-3-selected.png`）。同一个站的 `id` 跨环境保持一致。
 - 一次测试 = **选一个环境** + 在其中作用于 **一个或多个站**。单站是最常见情形（N=1）；涉及多个站（跨站联动）按下面的「跨站测试」执行。
 - **测哪个环境、是否跨站、涉及哪几个站，都由用户在意图 / AC 阶段说清**——不自己猜，也没有预存的"场景"文件。开始前读对应的 `targets/<env>.md` 取各站 URL。
 
@@ -238,7 +249,7 @@ cookie 用全项目**同一份全量** `secrets/cookies-all.json`——含你 Ch
 单站测试就一个 session（上面的 `$SID`）。**跨站测试**（同一环境下碰多个站）时，cookie 不变——还是同一份全量 `secrets/cookies-all.json`，它本来就含所有站。差别只在 **session**：本次涉及的每个站起一个 **独立 session**，名 = `$SID-<site-id>`（如 `$SID-portal` / `$SID-billing`），这样各站页面同时活着，在 A 操作完切到 B 直接看，不丢 B 的 filter / 滚动状态。遍历本次站清单（`ac.md` 的 `## 站` 块）批量起，每个都导入同一份全量 cookie：
 
 ```bash
-# 对清单里每个涉及的站（id=portal / billing / ...）：
+# 对清单里每个涉及的站（id=xxx / ...）：
 browser-use --session $SID-portal  open <portal 目标页>      # URL 从 targets/<env>.md 取
 browser-use --session $SID-portal  cookies import secrets/cookies-all.json
 browser-use --session $SID-portal  open <portal 目标页>      # import 后必须重新 open 才生效
@@ -284,7 +295,7 @@ browser-use cookies export secrets/cookies-all.json   # 不带 --url = 全量，
 
 ## 跨站测试（多站场景）
 
-当用户在意图 / AC 阶段声明本次测试要在 **同一环境下的多个站** 之间联动（在 A 操作、在 B / C 观察效果），启用这一节。**只在涉及 ≥2 个站时启用**；单站测试一切照旧。核心原则：**cookie 这层塌成一份全量，但"站"作为产物维度始终保留**——否则报告说不清"在哪操作、在哪观察"。
+当用户在意图 / AC 阶段声明本次测试要在 **同一环境下的多个站** 之间联动（在 A 操作、在 B / C 观察效果），启用这一节。**只在涉及 ≥2 个站时启用**；单站测试一切照旧——`ac.md` **不写** `## 站` 块、session 用裸 `$SID`、截图**不带**站前缀。核心原则：**cookie 这层塌成一份全量，但"站"作为产物维度始终保留**——否则报告说不清"在哪操作、在哪观察"。
 
 - **环境是 run 级的、单一的**：一个跨站测试始终在一个环境内（全程 qa 或全程 uat），不混。开始前读对应的 `targets/<env>.md` 拿到本环境的站清单（`id → URL`）。
 - **本次涉及哪几个站 + 各自角色（操作端 / 观察端），由用户在 AC 阶段说清**，记进该 run 的 `ac.md` 一个 `## 站` 块：每行 `@<id> → 本环境 URL + 角色`。这份 `## 站` 块就是本次的**站清单**——起 session、`@site` 标注都按它来。
@@ -434,11 +445,3 @@ browser-use eval "<触发动作的 click>" \
 - 不要编造测试结果。页面没加载就如实记录并停下来——不要猜"如果加载了会怎样"。
 - 不要从这个目录自动 commit 任何东西到 git。测试产物是本地资料。
 - 不要删除或改写过往的 `runs/` 目录——它们是证据。
-
-```
-
-```
-
-```
-
-```
